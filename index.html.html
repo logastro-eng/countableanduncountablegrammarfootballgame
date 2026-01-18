@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grammar Dribbler: Premier League</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Teko:wght@400;600&family=Roboto:wght@400;700&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden;
+            background-color: #121212;
+            color: white;
+            font-family: 'Roboto', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            user-select: none;
+        }
+
+        #game-wrapper {
+            position: relative;
+            width: 900px;
+            height: 650px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 4px solid #fff;
+            background: #2d6a36;
+        }
+
+        canvas {
+            display: block;
+            background: linear-gradient(to bottom, #2d6a36 0%, #3e8e41 50%, #2d6a36 100%);
+        }
+
+        /* --- LOGO SVG CLASS --- */
+        .pl-logo {
+            width: 120px;
+            height: 120px;
+            fill: #3d195b; /* Premier League Purple */
+            filter: drop-shadow(0 0 10px rgba(255,255,255,0.5));
+            margin-bottom: 20px;
+        }
+
+        /* --- UI OVERLAYS --- */
+        .screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(13, 43, 22, 0.95);
+            background: radial-gradient(circle, rgba(20,60,30,0.95) 0%, rgba(5,20,10,0.98) 100%);
+            z-index: 20;
+            transition: opacity 0.3s;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        h1 {
+            font-family: 'Teko', sans-serif;
+            color: #fff;
+            font-size: 70px;
+            margin: 0;
+            text-transform: uppercase;
+            text-align: center;
+            line-height: 0.9;
+        }
+        
+        .title-accent { color: #f1c40f; }
+
+        h2 { color: #fff; margin-bottom: 20px; text-transform: uppercase; font-family: 'Teko', sans-serif; font-size: 30px; letter-spacing: 2px; }
+        p { font-size: 18px; color: #ccc; margin-bottom: 20px; text-align: center; max-width: 600px;}
+
+        input[type="text"] {
+            padding: 15px;
+            font-size: 22px;
+            border-radius: 5px;
+            border: 3px solid #fff;
+            background: #f8f9fa;
+            width: 300px;
+            text-align: center;
+            margin-bottom: 20px;
+            font-family: 'Teko', sans-serif;
+            font-weight: 600;
+        }
+
+        button.menu-btn {
+            padding: 10px 40px;
+            font-family: 'Teko', sans-serif;
+            font-size: 28px;
+            color: #fff;
+            background: #3d195b; /* PL Purple */
+            border: 2px solid #00ff85; /* PL Green */
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px #000;
+            transition: transform 0.1s;
+            margin: 10px;
+            text-transform: uppercase;
+        }
+        button.menu-btn:hover { transform: scale(1.05); background: #4e2a6f; }
+        button.menu-btn:active { transform: translateY(3px); }
+
+        /* --- CONTROLS --- */
+        #controls-area {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+
+        .game-btn {
+            width: 120px;
+            height: 80px;
+            border-radius: 10px;
+            border: 3px solid #fff;
+            font-family: 'Teko', sans-serif;
+            font-size: 32px;
+            color: white;
+            cursor: pointer;
+            box-shadow: 0 6px rgba(0,0,0,0.5);
+            transition: all 0.1s;
+            text-shadow: 2px 2px 0 rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .game-btn:active { transform: translateY(4px); box-shadow: 0 2px rgba(0,0,0,0.5); }
+        .btn-a { background: #e74c3c; }    
+        .btn-an { background: #3498db; }   
+        .btn-some { background: #9b59b6; } 
+        .btn-any { background: #f39c12; }  
+
+        .key-hint {
+            font-size: 14px;
+            font-family: 'Roboto', sans-serif;
+            position: absolute;
+            top: 5px; left: 5px;
+            opacity: 0.7;
+            font-weight: bold;
+        }
+
+        /* --- HUD --- */
+        #hud {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 70px;
+            background: linear-gradient(to right, #3d195b, #000);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px;
+            box-sizing: border-box;
+            z-index: 15;
+            border-bottom: 4px solid #00ff85;
+        }
+        .hud-text { font-family: 'Teko', sans-serif; font-size: 28px; color: #fff; }
+        .hud-score { color: #00ff85; }
+        
+        .mini-logo {
+            width: 40px; height: 40px; fill: #fff; margin-right: 10px;
+        }
+
+        /* --- FEEDBACK --- */
+        #feedback {
+            position: absolute;
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Teko', sans-serif;
+            font-size: 80px;
+            font-weight: bold;
+            text-shadow: 3px 3px 0 #000;
+            pointer-events: none;
+            opacity: 0;
+            z-index: 12;
+            white-space: nowrap;
+        }
+        .feedback-good { color: #00ff85; animation: popUp 0.8s forwards; }
+        .feedback-bad { color: #e74c3c; animation: shake 0.5s forwards; }
+
+        @keyframes popUp {
+            0% { opacity: 0; transform: translate(-50%, -20%) scale(0.5); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+            100% { opacity: 0; transform: translate(-50%, -80%) scale(1); }
+        }
+        @keyframes shake {
+            0% { transform: translate(-50%, -50%) translateX(0); opacity: 1; }
+            25% { transform: translate(-50%, -50%) translateX(-20px); }
+            50% { transform: translate(-50%, -50%) translateX(20px); }
+            75% { transform: translate(-50%, -50%) translateX(-20px); }
+            100% { transform: translate(-50%, -50%) translateX(0); opacity: 0; }
+        }
+
+        /* --- MISSED SCREEN --- */
+        #screen-missed { background: rgba(61, 25, 91, 0.95); } /* Purple tint */
+        .correction-box {
+            background: rgba(0,0,0,0.4);
+            border: 2px solid #00ff85;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <canvas id="gameCanvas" width="900" height="650"></canvas>
+
+    <!-- HUD -->
+    <div id="hud" class="hidden">
+        <div style="display:flex; align-items:center;">
+            <!-- Simple Lion Icon SVG -->
+            <svg class="mini-logo" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-5-9h10v2H7z"/></svg>
+            <div class="hud-text">PLAYER: <span id="hud-name" style="color:#3498db"></span></div>
+        </div>
+        <div class="hud-text">GOALS: <span id="hud-goals" class="hud-score">0</span> | DRIBBLES: <span id="hud-score">0</span></div>
+        <div class="hud-text">LIVES: <span id="hud-lives" style="color:#e74c3c">❤️❤️❤️</span></div>
+    </div>
+
+    <!-- CONTROLS -->
+    <div id="controls-area" class="hidden">
+        <div class="game-btn btn-a" onclick="handleInput('A')">
+            <span class="key-hint">1</span> A
+        </div>
+        <div class="game-btn btn-an" onclick="handleInput('AN')">
+            <span class="key-hint">2</span> AN
+        </div>
+        <div class="game-btn btn-some" onclick="handleInput('SOME')">
+            <span class="key-hint">3</span> SOME
+        </div>
+        <div class="game-btn btn-any" onclick="handleInput('ANY')">
+            <span class="key-hint">4</span> ANY
+        </div>
+    </div>
+
+    <!-- FEEDBACK POPUP -->
+    <div id="feedback"></div>
+
+    <!-- 1. LOGIN SCREEN -->
+    <div id="screen-login" class="screen">
+        <!-- Shield Logo SVG -->
+        <svg class="pl-logo" viewBox="0 0 100 100">
+            <path d="M50 5 L90 20 L90 50 C90 75 50 95 50 95 C50 95 10 75 10 50 L10 20 Z" fill="#fff"/>
+            <path d="M50 10 L85 23 L85 50 C85 71 50 88 50 88 C50 88 15 71 15 50 L15 23 Z" fill="#3d195b"/>
+            <!-- Lion Head shape simplified -->
+            <path d="M35 35 C35 30 40 25 50 25 C60 25 65 30 65 35 C65 45 60 55 50 65 C40 55 35 45 35 35 Z M45 40 A2 2 0 0 1 45 44 M55 40 A2 2 0 0 1 55 44" fill="#00ff85"/>
+            <path d="M48 55 L52 55 L50 60 Z" fill="#00ff85"/>
+        </svg>
+        
+        <h1>GRAMMAR<br><span class="title-accent">DRIBBLER</span></h1>
+        <h2 style="color: #00ff85">PREMIER LEAGUE</h2>
+        <p>Dribble past defenders by choosing the correct quantifier!<br>Use keys 1, 2, 3, 4 or click buttons.</p>
+        <input type="text" id="player-name" placeholder="Enter Player Name" maxlength="12" autofocus>
+        <button class="menu-btn" onclick="startGame()">KICK OFF</button>
+    </div>
+
+    <!-- 2. GAME OVER SCREEN -->
+    <div id="screen-gameover" class="screen hidden">
+        <h1 style="font-size: 50px;">MATCH FINISHED</h1>
+        <p id="final-stats" style="font-size: 24px; color: #fff;"></p>
+        <button class="menu-btn" onclick="resetGame()">PLAY AGAIN</button>
+    </div>
+
+    <!-- 3. CORRECTION SCREEN -->
+    <div id="screen-missed" class="screen hidden">
+        <h1 style="color:#e74c3c">FOUL!</h1>
+        <div class="correction-box">
+            <p style="margin:0; font-size: 16px; color:#ccc">The defender had:</p>
+            <h2 id="missed-question" style="font-size: 28px; margin: 10px 0;">...</h2>
+            <p style="margin:0; font-size: 16px; color:#ccc">Correct move:</p>
+            <h2 id="missed-answer" style="font-size: 40px; color:#f1c40f; margin: 10px 0;">...</h2>
+        </div>
+        <p>Type the correct answer to continue dribbling:</p>
+        <input type="text" id="correction-input" placeholder="Type here..." autocomplete="off">
+        <button class="menu-btn" id="resume-btn" disabled onclick="resumeGame()">RESUME</button>
+    </div>
+</div>
+
+<script>
+    /* --- DATABASE (80 ENTRIES) --- */
+    const grammarDB = [
+        // A (Singular Countable - Consonant Sound)
+        { q: "_____ banana", a: "A", type: "single" },
+        { q: "_____ burger", a: "A", type: "single" },
+        { q: "_____ hot dog", a: "A", type: "single" },
+        { q: "_____ sausage", a: "A", type: "single" },
+        { q: "_____ tomato", a: "A", type: "single" },
+        { q: "_____ potato", a: "A", type: "single" },
+        { q: "_____ biscuit", a: "A", type: "single" },
+        { q: "_____ sandwich", a: "A", type: "single" },
+        { q: "_____ pear", a: "A", type: "single" },
+        { q: "_____ lemon", a: "A", type: "single" },
+        { q: "_____ melon", a: "A", type: "single" },
+        { q: "_____ cucumber", a: "A", type: "single" },
+        { q: "_____ strawberry", a: "A", type: "single" },
+        { q: "_____ cake", a: "A", type: "single" },
+        { q: "_____ sweet", a: "A", type: "single" },
+        { q: "_____ bottle of water", a: "A", type: "single" },
+        { q: "_____ cup of tea", a: "A", type: "single" },
+        { q: "_____ packet of crisps", a: "A", type: "single" },
+        { q: "_____ pizza", a: "A", type: "single" },
+        { q: "_____ carrot", a: "A", type: "single" },
+
+        // AN (Singular Countable - Vowel Sound)
+        { q: "_____ apple", a: "AN", type: "single" },
+        { q: "_____ orange", a: "AN", type: "single" },
+        { q: "_____ egg", a: "AN", type: "single" },
+        { q: "_____ onion", a: "AN", type: "single" },
+        { q: "_____ ice cream", a: "AN", type: "single" },
+        { q: "_____ umbrella", a: "AN", type: "single" },
+        { q: "_____ hour", a: "AN", type: "single" },
+        { q: "_____ avocado", a: "AN", type: "single" },
+        { q: "_____ apricot", a: "AN", type: "single" },
+        { q: "_____ aubergine", a: "AN", type: "single" },
+
+        // SOME (Affirmative - Countable Plural)
+        { q: "There are _____ chips.", a: "SOME", type: "plural" },
+        { q: "We've got _____ biscuits.", a: "SOME", type: "plural" },
+        { q: "I have _____ grapes.", a: "SOME", type: "plural" },
+        { q: "There are _____ carrots.", a: "SOME", type: "plural" },
+        { q: "She bought _____ apples.", a: "SOME", type: "plural" },
+        { q: "We need _____ eggs.", a: "SOME", type: "plural" },
+        { q: "I want _____ strawberries.", a: "SOME", type: "plural" },
+        { q: "There are _____ sweets.", a: "SOME", type: "plural" },
+        { q: "He has _____ burgers.", a: "SOME", type: "plural" },
+        { q: "There are _____ onions.", a: "SOME", type: "plural" },
+
+        // SOME (Affirmative - Uncountable)
+        { q: "I'd like _____ water.", a: "SOME", type: "uncount" },
+        { q: "There is _____ cheese.", a: "SOME", type: "uncount" },
+        { q: "We have got _____ bread.", a: "SOME", type: "uncount" },
+        { q: "Have _____ tea.", a: "SOME", type: "uncount" },
+        { q: "There is _____ milk.", a: "SOME", type: "uncount" },
+        { q: "I need _____ sugar.", a: "SOME", type: "uncount" },
+        { q: "She wants _____ chocolate.", a: "SOME", type: "uncount" },
+        { q: "There is _____ rice.", a: "SOME", type: "uncount" },
+        { q: "We've got _____ pasta.", a: "SOME", type: "uncount" },
+        { q: "There is _____ soup.", a: "SOME", type: "uncount" },
+        { q: "I'd like _____ juice.", a: "SOME", type: "uncount" },
+        { q: "There is _____ jam.", a: "SOME", type: "uncount" },
+        { q: "We have _____ honey.", a: "SOME", type: "uncount" },
+        { q: "There is _____ meat.", a: "SOME", type: "uncount" },
+        { q: "Add _____ salt.", a: "SOME", type: "uncount" },
+
+        // ANY (Negative / Question - Countable Plural)
+        { q: "Are there _____ chips?", a: "ANY", type: "neg_quest" },
+        { q: "There aren't _____ apples.", a: "ANY", type: "neg_quest" },
+        { q: "Have we got _____ biscuits?", a: "ANY", type: "neg_quest" },
+        { q: "We haven't got _____ eggs.", a: "ANY", type: "neg_quest" },
+        { q: "Are there _____ burgers?", a: "ANY", type: "neg_quest" },
+        { q: "There aren't _____ sausages.", a: "ANY", type: "neg_quest" },
+        { q: "Have you got _____ sweets?", a: "ANY", type: "neg_quest" },
+        { q: "She hasn't got _____ bananas.", a: "ANY", type: "neg_quest" },
+        { q: "Are there _____ onions?", a: "ANY", type: "neg_quest" },
+        { q: "There aren't _____ sandwiches.", a: "ANY", type: "neg_quest" },
+
+        // ANY (Negative / Question - Uncountable)
+        { q: "Is there _____ water?", a: "ANY", type: "neg_quest" },
+        { q: "There isn't _____ bread.", a: "ANY", type: "neg_quest" },
+        { q: "Have we got _____ cheese?", a: "ANY", type: "neg_quest" },
+        { q: "We haven't got _____ milk.", a: "ANY", type: "neg_quest" },
+        { q: "Is there _____ sugar?", a: "ANY", type: "neg_quest" },
+        { q: "There isn't _____ rice.", a: "ANY", type: "neg_quest" },
+        { q: "Have you got _____ pasta?", a: "ANY", type: "neg_quest" },
+        { q: "There isn't _____ juice.", a: "ANY", type: "neg_quest" },
+        { q: "Is there _____ chocolate?", a: "ANY", type: "neg_quest" },
+        { q: "We haven't got _____ honey.", a: "ANY", type: "neg_quest" },
+        { q: "Is there _____ soup?", a: "ANY", type: "neg_quest" },
+        { q: "There isn't _____ tea.", a: "ANY", type: "neg_quest" },
+        { q: "Have we got _____ cola?", a: "ANY", type: "neg_quest" },
+        { q: "There isn't _____ butter.", a: "ANY", type: "neg_quest" },
+        { q: "Is there _____ flour?", a: "ANY", type: "neg_quest" }
+    ];
+
+    /* --- GAME LOGIC --- */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    
+    let playerName = "Player";
+    let score = 0; // Dribbles
+    let goals = 0;
+    let lives = 3;
+    let gameState = "LOGIN"; // LOGIN, PLAY, MISSED, GAMEOVER, GOAL_ANIM
+    
+    // Player Character
+    const player = { x: 450, y: 550, radius: 25, color: '#3498db', targetX: 450 };
+    
+    // Game Entities
+    let defenders = [];
+    let particles = [];
+    let spawnTimer = 0;
+    let spawnInterval = 280; // Slower spawn (approx 5 seconds)
+    let speedMultiplier = 1;
+    let dribblesForGoal = 5;
+    let currentDribbleStreak = 0;
+
+    // Assets (Simulated with drawing)
+    const pitchColor = ["#2d6a36", "#3e8e41"]; // Light and dark green stripes
+
+    /* --- INPUT HANDLING --- */
+    function handleInput(answer) {
+        if (gameState !== "PLAY") return;
+
+        // Find the closest defender
+        if (defenders.length === 0) return;
+        
+        // Sort defenders by Y position (closest to player first)
+        defenders.sort((a, b) => b.y - a.y);
+        let targetDefender = defenders[0];
+
+        // Only interact if defender is somewhat close (in the "action zone")
+        if (targetDefender.y > 100) {
+            if (answer === targetDefender.data.a) {
+                // Correct!
+                successDribble(targetDefender);
+            } else {
+                // Wrong!
+                failDribble(targetDefender);
+            }
+        }
+    }
+
+    // Keyboard support
+    document.addEventListener('keydown', (e) => {
+        if (gameState === "PLAY") {
+            if (e.key === '1') handleInput('A');
+            if (e.key === '2') handleInput('AN');
+            if (e.key === '3') handleInput('SOME');
+            if (e.key === '4') handleInput('ANY');
+        } else if (gameState === "MISSED") {
+            // Typing correction
+             if (e.key === 'Enter') {
+                 if (!document.getElementById('resume-btn').disabled) resumeGame();
+             }
+        }
+    });
+
+    document.getElementById('correction-input').addEventListener('input', function() {
+        const target = document.getElementById('missed-answer').innerText.toLowerCase();
+        if (this.value.toLowerCase().trim() === target.toLowerCase()) {
+            this.style.borderColor = "#2ecc71";
+            this.style.backgroundColor = "#d5f5e3";
+            document.getElementById('resume-btn').disabled = false;
+        } else {
+            this.style.borderColor = "#e74c3c";
+            this.style.backgroundColor = "#fff";
+            document.getElementById('resume-btn').disabled = true;
+        }
+    });
+
+    /* --- GAME LOOP --- */
+    function startGame() {
+        const inputName = document.getElementById('player-name').value.trim();
+        if (inputName) playerName = inputName;
+        
+        score = 0;
+        goals = 0;
+        lives = 3;
+        currentDribbleStreak = 0;
+        speedMultiplier = 1;
+        defenders = [];
+        particles = [];
+        
+        document.getElementById('screen-login').classList.add('hidden');
+        document.getElementById('screen-gameover').classList.add('hidden');
+        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('controls-area').classList.remove('hidden');
+        
+        document.getElementById('hud-name').textContent = playerName;
+        updateHUD();
+        
+        gameState = "PLAY";
+        requestAnimationFrame(gameLoop);
+    }
+
+    function gameLoop() {
+        if (gameState === "PLAY" || gameState === "GOAL_ANIM") {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+    }
+
+    function update() {
+        if (gameState === "GOAL_ANIM") {
+            // Just animate particles
+            updateParticles();
+            return;
+        }
+
+        spawnTimer++;
+        // Spawn defenders
+        if (spawnTimer > spawnInterval) {
+            spawnDefender();
+            spawnTimer = 0;
+            // Increase speed slightly
+            if (spawnInterval > 120) spawnInterval -= 1;
+            speedMultiplier += 0.005;
+        }
+
+        // Move defenders
+        for (let i = defenders.length - 1; i >= 0; i--) {
+            let d = defenders[i];
+            d.y += 0.6 * speedMultiplier; // SLOWED DOWN MOVEMENT
+
+            // Collision detection (Player hits defender without answering)
+            // Distance check
+            let dist = Math.hypot(d.x - player.x, d.y - player.y);
+            if (dist < d.radius + player.radius) {
+                failDribble(d);
+            }
+
+            // Remove if off screen (missed opportunity?)
+            // Let's count it as a miss for gameplay tension
+            if (d.y > canvas.height + 50) {
+                 failDribble(d);
+            }
+        }
+
+        updateParticles();
+    }
+
+    function spawnDefender() {
+        const entry = grammarDB[Math.floor(Math.random() * grammarDB.length)];
+        // Random X position within a central lane width
+        const xPos = Math.random() * (600) + 150; // Keep somewhat central
+        
+        defenders.push({
+            x: xPos,
+            y: -50,
+            radius: 40,
+            data: entry,
+            color: '#e74c3c' // Red jersey
+        });
+    }
+
+    function successDribble(defender) {
+        // Remove defender
+        const idx = defenders.indexOf(defender);
+        if (idx > -1) defenders.splice(idx, 1);
+
+        // Score
+        score++;
+        currentDribbleStreak++;
+        showFeedback("NICE DRIBBLE!", "good");
+        
+        // Particle effect (Green)
+        createExplosion(defender.x, defender.y, "#2ecc71");
+
+        // Check Goal
+        if (currentDribbleStreak >= dribblesForGoal) {
+            triggerGoal();
+        }
+
+        updateHUD();
+    }
+
+    function failDribble(defender) {
+        // Pause game logic
+        gameState = "MISSED";
+        lives--;
+        updateHUD();
+
+        // Check Game Over
+        if (lives <= 0) {
+            gameOver();
+            return;
+        }
+
+        // Show Correction Screen
+        const screen = document.getElementById('screen-missed');
+        const qEl = document.getElementById('missed-question');
+        const aEl = document.getElementById('missed-answer');
+        
+        qEl.textContent = defender.data.q;
+        aEl.textContent = defender.data.a;
+        
+        document.getElementById('correction-input').value = "";
+        document.getElementById('resume-btn').disabled = true;
+        
+        // Remove the specific defender so we don't hit them again on resume
+        const idx = defenders.indexOf(defender);
+        if (idx > -1) defenders.splice(idx, 1);
+        
+        screen.classList.remove('hidden');
+        document.getElementById('correction-input').focus();
+    }
+
+    function triggerGoal() {
+        gameState = "GOAL_ANIM";
+        goals++;
+        currentDribbleStreak = 0;
+        updateHUD();
+        
+        showFeedback("GOOOOAL!!!", "good");
+        
+        // Massive explosion
+        for(let i=0; i<5; i++) {
+            setTimeout(() => {
+                createExplosion(Math.random()*900, Math.random()*600, "#f1c40f");
+                createExplosion(Math.random()*900, Math.random()*600, "#fff");
+            }, i * 200);
+        }
+
+        // Resume after 2 seconds
+        setTimeout(() => {
+            if (gameState === "GOAL_ANIM") gameState = "PLAY";
+        }, 2000);
+    }
+
+    function resumeGame() {
+        document.getElementById('screen-missed').classList.add('hidden');
+        gameState = "PLAY";
+        requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+        gameState = "GAMEOVER";
+        document.getElementById('screen-missed').classList.add('hidden'); // Ensure missed is closed
+        document.getElementById('screen-gameover').classList.remove('hidden');
+        document.getElementById('final-stats').innerHTML = 
+            `Player: ${playerName}<br>Goals: ${goals}<br>Total Dribbles: ${score}`;
+        document.getElementById('controls-area').classList.add('hidden');
+    }
+
+    function resetGame() {
+        document.getElementById('screen-login').classList.remove('hidden');
+    }
+
+    /* --- RENDERING --- */
+    function draw() {
+        // 1. Draw Pitch (Stripes)
+        const stripeHeight = 100;
+        for (let i = 0; i < canvas.height / stripeHeight; i++) {
+            ctx.fillStyle = pitchColor[i % 2];
+            ctx.fillRect(0, i * stripeHeight, canvas.width, stripeHeight);
+        }
+        
+        // Pitch Lines (Center Circle)
+        ctx.strokeStyle = "rgba(255,255,255,0.3)";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.arc(450, 325, 100, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(0, 325);
+        ctx.lineTo(900, 325);
+        ctx.stroke();
+
+        // 2. Draw Player
+        ctx.fillStyle = player.color; // Blue Shirt
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = "#fff";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+        // Label
+        ctx.fillStyle = "#fff";
+        ctx.font = "bold 12px Roboto";
+        ctx.textAlign = "center";
+        ctx.fillText("YOU", player.x, player.y + 5);
+
+        // 3. Draw Defenders
+        defenders.forEach(d => {
+            // Draw Defender Character (Vector style)
+            // Head
+            ctx.fillStyle = "#ffdbac"; // Skin
+            ctx.beginPath();
+            ctx.arc(d.x, d.y - 15, 12, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Body (Jersey)
+            ctx.fillStyle = d.color; // Red
+            ctx.beginPath();
+            ctx.roundRect(d.x - 18, d.y - 5, 36, 30, 5);
+            ctx.fill();
+            
+            // Arms (Simple lines)
+            ctx.strokeStyle = "#ffdbac";
+            ctx.lineWidth = 6;
+            ctx.beginPath();
+            ctx.moveTo(d.x - 18, d.y);
+            ctx.lineTo(d.x - 30, d.y + 15); // Left arm
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(d.x + 18, d.y);
+            ctx.lineTo(d.x + 30, d.y + 15); // Right arm
+            ctx.stroke();
+            
+            // Text Bubble (Speech)
+            ctx.fillStyle = "white";
+            ctx.beginPath();
+            // Tail
+            ctx.moveTo(d.x, d.y - 30);
+            ctx.lineTo(d.x - 10, d.y - 50);
+            ctx.lineTo(d.x + 10, d.y - 50);
+            ctx.fill();
+            // Bubble body
+            ctx.beginPath();
+            ctx.roundRect(d.x - 120, d.y - 95, 240, 45, 15);
+            ctx.fill();
+            ctx.strokeStyle = "#000";
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            ctx.fillStyle = "#000";
+            ctx.font = "bold 18px Roboto";
+            ctx.textAlign = "center";
+            ctx.fillText(d.data.q, d.x, d.y - 67);
+        });
+
+        // 4. Draw Particles
+        particles.forEach(p => {
+            ctx.globalAlpha = p.alpha;
+            ctx.fillStyle = p.color;
+            ctx.fillRect(p.x, p.y, p.size, p.size);
+            ctx.globalAlpha = 1.0;
+        });
+    }
+
+    /* --- EFFECTS --- */
+    function createExplosion(x, y, color) {
+        for(let i=0; i<20; i++) {
+            particles.push({
+                x: x, y: y,
+                vx: (Math.random() - 0.5) * 10,
+                vy: (Math.random() - 0.5) * 10,
+                size: Math.random() * 5 + 3,
+                color: color,
+                alpha: 1
+            });
+        }
+    }
+
+    function updateParticles() {
+        for (let i = particles.length - 1; i >= 0; i--) {
+            let p = particles[i];
+            p.x += p.vx;
+            p.y += p.vy;
+            p.alpha -= 0.02;
+            if (p.alpha <= 0) particles.splice(i, 1);
+        }
+    }
+
+    function showFeedback(text, type) {
+        const el = document.getElementById('feedback');
+        el.textContent = text;
+        el.className = ""; // reset
+        void el.offsetWidth; // trigger reflow
+        el.className = "feedback-" + type;
+    }
+
+    function updateHUD() {
+        document.getElementById('hud-score').textContent = score;
+        document.getElementById('hud-goals').textContent = goals;
+        let hearts = "";
+        for(let i=0; i<lives; i++) hearts += "❤️";
+        document.getElementById('hud-lives').textContent = hearts;
+    }
+
+</script>
+</body>
+</html>
